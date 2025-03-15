@@ -1,52 +1,65 @@
 
 
-use mini_redis::{Connection, Frame};
-use tokio::net::{TcpListener, TcpStream};
+use std::{io::{Read, Write}, net::{TcpListener, TcpStream}, sync::{Arc, Mutex}};
+
+use super::client::Client;
 
 pub struct Server {
     max_allowed_connections:i16,
     port: i16,
-    connections: Vec<Connection>
+    connections: Arc<Mutex<Vec<Client>>>
 }
 
 impl Server {
-    pub fn new(&self, max_allowed_connections: Option<i16>, port: Option<i16>) -> Self {
+    pub fn new( max_allowed_connections: Option<i16>, port: Option<i16>) -> Self {
         Self {
-            max_allowed_connections : max_allowed_connections.unwrap_or(50000),
+            max_allowed_connections : max_allowed_connections.unwrap_or(5000),
             port: port.unwrap_or(3333),
-            connections: Vec::new(),
+            connections: Arc::new(Mutex::new(Vec::new())), 
         }
     }
 
-    pub async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let address = format!("{}:{}", "127.0.0.1", self.port);
         println!("Starting server on {}", address);
-        let listener = TcpListener::bind(address).await.unwrap();
+        let listener = TcpListener::bind(address).unwrap();
 
         loop {
             // The second item contains the IP and port of the new connection.
-            let (socket, _) = listener.accept().await.unwrap();
-            
-            self.handle_client(socket).await;
+            let (socket, _) = listener.accept().unwrap();
+            let _ = &self.handle_client(socket).await;
         }
     }
 
-    async fn handle_client(&self, socket: TcpStream) {
-        let mut connection = Connection::new(socket);
-        let size = {
-            let locked_vec = self.connections.to_vec().lock().await;
-            locked_vec.len()
-        };
-        if(size >  self.max_allowed_connections)
+    async fn handle_client(&mut self, mut  stream: TcpStream) {
+        
+        let peer_addr = stream.peer_addr().unwrap();
+        println!("Client connecté: {}", peer_addr);
         {
-            
-            connection.write_frame("Too much connexion atm");
-            socket.shutdown();
+            let mut clients_guard = self.connections.lock().unwrap();
+
+            let client = Client::new(stream.try_clone().unwrap());
+            clients_guard.push(client); 
         }
-        if let Some(frame) = connection.read_frame().await.unwrap() {
-            println!("GOT: {:?}", frame);
-            let response = Frame::Error("unimplemented".to_string());
-            connection.write_frame(&response).await.unwrap();
+        let mut buffer = [0; 512];
+        loop {
+            match stream.read(&mut buffer) {
+                Ok(0) => {
+                    println!("Client déconnecté: {}", peer_addr);
+                    break;
+                }
+                Ok(_) => {
+                    let message = String::from_utf8_lossy(&buffer);
+                    println!("Message reçu de {}: {}", peer_addr, message);
+                    
+                    // Envoyer un message de confirmation au client
+                    stream.write_all("Message reçu !".as_bytes()).unwrap();
+                }
+                Err(e) => {
+                    println!("Erreur avec le client {}: {}", peer_addr, e);
+                    break;
+                }
+            }
         }
-    }
+      }
 }
