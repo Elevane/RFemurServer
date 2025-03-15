@@ -51,9 +51,8 @@ impl Server {
                 Ok(_) => {
                     let message = String::from_utf8_lossy(&buffer);
                     println!("Message reçu de {}: {}", peer_addr, message);
+                    decode_message(message);
                     
-                    // Envoyer un message de confirmation au client
-                    stream.write_all("Message reçu !".as_bytes()).unwrap();
                 }
                 Err(e) => {
                     println!("Erreur avec le client {}: {}", peer_addr, e);
@@ -62,4 +61,12 @@ impl Server {
             }
         }
       }
+      pub fn decode_message(&mut self, message: std::borrow::Cow<'_, str>) -> _ {
+        let parts = message.split("|");
+        if(parts.clone().count() < 3 as usize){
+            Err("Incorrect tcp format");
+        }
+    }
 }
+
+
