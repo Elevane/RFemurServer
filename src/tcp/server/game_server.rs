@@ -35,12 +35,6 @@ impl Server {
         
         let peer_addr = stream.peer_addr().unwrap();
         println!("Client connecté: {}", peer_addr);
-        {
-            let mut clients_guard = self.connections.lock().unwrap();
-
-            let client = Client::new(stream.try_clone().unwrap());
-            clients_guard.push(client); 
-        }
         let mut buffer = [0; 512];
         loop {
             match stream.read(&mut buffer) {
@@ -51,21 +45,28 @@ impl Server {
                 Ok(_) => {
                     let message = String::from_utf8_lossy(&buffer);
                     println!("Message reçu de {}: {}", peer_addr, message);
-                    decode_message(message);
+                    
+                    self.decode_message(message);
+                    {
+                        let mut clients_guard = self.connections.lock().unwrap();
+                        let client = Client::new(stream.try_clone().unwrap());
+                        clients_guard.push(client); 
+                    }
                     
                 }
                 Err(e) => {
                     println!("Erreur avec le client {}: {}", peer_addr, e);
-                    break;
+                    
                 }
             }
         }
       }
-      pub fn decode_message(&mut self, message: std::borrow::Cow<'_, str>) -> _ {
+      pub fn decode_message(&mut self, message: std::borrow::Cow<'_, str>) -> () {
         let parts = message.split("|");
         if(parts.clone().count() < 3 as usize){
-            Err("Incorrect tcp format");
+            panic!("Incorrect tcp format");
         }
+
     }
 }
 
