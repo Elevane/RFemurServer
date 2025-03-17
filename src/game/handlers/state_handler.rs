@@ -8,7 +8,7 @@ use crate::{
 
 use std::{collections::HashMap, io::Write, net::TcpStream};
 
-use super::{connect_handler::ConnectHandler, handler::Handler};
+use super::{connect_handler::ConnectHandler, handler::Handler, move_handler::MoveHandler};
 pub struct StateHandler {
     game_state: GameState,
     handlers: HashMap<i8, Box<dyn Handler>>,
@@ -19,6 +19,10 @@ impl StateHandler {
         handlers.insert(
             ServerOperation::ConnectServerRequest as i8,
             Box::new(ConnectHandler),
+        );
+        handlers.insert(
+            ServerOperation::MoveRequest as i8,
+            Box::new(MoveHandler),
         );
         Self {
             game_state,

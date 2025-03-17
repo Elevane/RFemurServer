@@ -17,18 +17,15 @@ public class TcpClientUnity : MonoBehaviour
 
     private bool isConnected = false;
 
-    // Start is called before the first frame update
     void Start()
     {
         ConnectToServer();
     }
 
-    // Update is called once per frame
     void Update()
     {
         if (isConnected)
         {
-            // Read message if available
             if (networkStream.DataAvailable)
             {
                 string message = reader.ReadLine();
@@ -40,7 +37,6 @@ public class TcpClientUnity : MonoBehaviour
         }
     }
 
-    // Connect to the server
     private void ConnectToServer()
     {
         try
@@ -59,7 +55,6 @@ public class TcpClientUnity : MonoBehaviour
         }
     }
 
-    // Send a message to the server
     public void SendMessageToServer(string message)
     {
         if (isConnected)
@@ -77,7 +72,6 @@ public class TcpClientUnity : MonoBehaviour
         }
     }
 
-    // Process incoming messages
     private void ProcessMessage(string message)
     {
         string[] parts = message.Split('|');
@@ -93,17 +87,10 @@ public class TcpClientUnity : MonoBehaviour
 
         Debug.Log($"Received message: Token = {token}, Operation = {operation}, Content = {content}");
 
-        // Perform different actions based on the operation
         switch (operation)
         {
-            case "Login":
-                // Handle login operation (this is just an example)
-                HandleLogin(content);
-                break;
-
-            case "Update":
-                // Handle data update operation
-                HandleDataUpdate(content);
+            case OperationType.MoveResponse:
+                onEntityMove(content);
                 break;
 
             default:
@@ -112,23 +99,6 @@ public class TcpClientUnity : MonoBehaviour
         }
     }
 
-    // Handle the login operation
-    private void HandleLogin(string content)
-    {
-        // Parse the login content (this is an example, you can parse JSON or other formats here)
-        Debug.Log("Handling login with content: " + content);
-        // Example: Update player state or show UI
-    }
-
-    // Handle data update operation
-    private void HandleDataUpdate(string content)
-    {
-        // Parse the content to update game state
-        Debug.Log("Handling data update with content: " + content);
-        // Example: Update game objects or variables based on the content
-    }
-
-    // Disconnect from the server
     private void OnApplicationQuit()
     {
         if (tcpClient != null && tcpClient.Connected)
@@ -141,4 +111,13 @@ public class TcpClientUnity : MonoBehaviour
 
         Debug.Log("Disconnected from server.");
     }
+
+    internal enum OperationType{
+            ConnectServerRequest,
+            ConnectServerRequestTokenResponse,
+            ConnectGameRequest,
+            MoveRequest,
+            MoveResponse,
+    }
+
 }

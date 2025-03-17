@@ -5,6 +5,8 @@ pub enum ServerOperation {
     ConnectServerRequest,
     ConnectServerRequestTokenResponse,
     ConnectGameRequest,
+    MoveRequest,
+    MoveResponse,
 }
 
 impl ServerOperation {
