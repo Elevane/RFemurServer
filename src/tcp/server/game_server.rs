@@ -1,21 +1,28 @@
+use std::{
+    io::Read,
+    net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
+};
 
-
-use std::{io::{Read, Write}, net::{TcpListener, TcpStream}, sync::{Arc, Mutex}};
+use crate::game::{game_state::GameState, handlers::state_handler::StateHandler};
 
 use super::{client::Client, packet::Packet};
 
 pub struct Server {
-    max_allowed_connections:i16,
+    max_allowed_connections: i16,
+    state_handler: StateHandler,
     port: i16,
-    connections: Arc<Mutex<Vec<Client>>>
+    connections: Arc<Mutex<Vec<Client>>>,
 }
 
 impl Server {
-    pub fn new( max_allowed_connections: Option<i16>, port: Option<i16>) -> Self {
+    pub fn new(max_allowed_connections: Option<i16>, port: Option<i16>) -> Self {
+        let game_state = GameState::new();
         Self {
-            max_allowed_connections : max_allowed_connections.unwrap_or(5000),
+            state_handler: StateHandler::init(game_state),
+            max_allowed_connections: max_allowed_connections.unwrap_or(5000),
             port: port.unwrap_or(3333),
-            connections: Arc::new(Mutex::new(Vec::new())), 
+            connections: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -31,8 +38,7 @@ impl Server {
         }
     }
 
-    fn handle_client(&mut self, mut  stream: TcpStream) {
-        
+    fn handle_client(&mut self, mut stream: TcpStream) {
         let peer_addr = stream.peer_addr().unwrap();
         println!("Client connecté: {}", peer_addr);
         let mut buffer = [0; 512];
@@ -44,30 +50,33 @@ impl Server {
                 }
                 Ok(_) => {
                     let message = String::from_utf8_lossy(&buffer);
-                    println!("Message reçu de {}: {}", peer_addr, message);
-                    
-                    self.decode_message(message);
+                    self.decode_message(stream.try_clone().unwrap(), message);
+                    if !self.connections.clone().lock().unwrap().len()
+                        >= self.max_allowed_connections as usize
                     {
                         let mut clients_guard = self.connections.lock().unwrap();
                         let client = Client::new(stream.try_clone().unwrap());
-                        clients_guard.push(client); 
+                        clients_guard.push(client);
+                    } else {
+                        println!(
+                            "reached maximum connections {}",
+                            self.max_allowed_connections
+                        )
                     }
-                    
                 }
                 Err(e) => {
                     println!("Erreur avec le client {}: {}", peer_addr, e);
-                    
                 }
             }
         }
-      }
-      pub fn decode_message(&mut self, message: std::borrow::Cow<'_, str>) -> () {
+    }
+    pub fn decode_message(&mut self, stream: TcpStream, message: std::borrow::Cow<'_, str>) -> () {
         let parts = message.split("|");
-        if(parts.clone().count() != 3 as usize ){
-            panic!("Incorrect tcp format");
+        if parts.clone().count() != 3 as usize {
+            let _ = stream.shutdown(std::net::Shutdown::Both);
+            return println!("Incorrect tcp format {}", parts.clone().count());
         }
-        let packet = Packet::decode(parts);
+        let packet = Packet::decode(parts).unwrap();
+        self.state_handler.handle(packet, stream);
     }
 }
-
-
