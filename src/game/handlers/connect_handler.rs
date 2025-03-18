@@ -28,17 +28,19 @@ impl Handler for ConnectHandler {
         let mut players_lock = game_state.players.lock().unwrap();
         players_lock.push(player_clone);
         let player_clone_2 = player.clone();
-        let response = format!("{{\"token\": \"{}\"}}", token);
-        let _ = player
-            .stream
-            .try_clone()
-            .expect("Erreur lors du clonage du stream")
-            .write_all(response.to_string().as_bytes());
         let data = format!(
             "{{\"x\": \"{}\",\"y\": \"{}\",\"uid\": \"{}\"}}",
             player_clone_2.x, player_clone_2.y, player_clone_2.uid
         );
         let packet = Packet::encode(ServerOperation::MoveResponse, data);
+        let response = format!("{{\"token\": \"{}\"}}", token);
+        let _ = player
+            .stream
+            .try_clone()
+            .expect("Erreur lors du clonage du stream")
+            .write_all(packet.to_string().as_bytes());
+       
+        
         game_state.notify(player.stream, packet, Notify::All);
     }
 }
