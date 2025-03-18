@@ -29,11 +29,12 @@ impl GameState {
             notify_scope as i8,
             tcp_stream.try_clone().unwrap().peer_addr()
         );
-        for cl in self.players.lock().unwrap().iter_mut() {
-            if cl.stream.peer_addr().unwrap() != tcp_stream.peer_addr().unwrap() {
-                cl.stream.write(message.as_bytes()).unwrap();
-            }
-        }
+        // TODO: FIX NOT NOTIFYING ERROR and lost error
+        // for cl in self.players.lock().unwrap().iter_mut() {
+        //     if cl.stream.peer_addr().unwrap() != tcp_stream.peer_addr().unwrap() {
+        //         cl.stream.write(message.as_bytes()).unwrap();
+        //     }
+        // }
     }
 }
 
