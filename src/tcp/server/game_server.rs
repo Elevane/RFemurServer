@@ -48,6 +48,8 @@ impl Server {
             match stream.read(&mut buffer) {
                 Ok(0) => {
                     println!("Client déconnecté: {}", peer_addr);
+                    self.disconnect(&stream);
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
                     break;
                 }
                 Ok(_) => {
