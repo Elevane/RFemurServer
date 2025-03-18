@@ -2,8 +2,9 @@ use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 
+#[derive(Clone)]
 pub struct Identity {
-    uid: String,
+    pub uid: String,
     //validity_date: DateTime<Utc>,
 }
 impl Identity {

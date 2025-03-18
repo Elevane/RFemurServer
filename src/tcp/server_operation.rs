@@ -15,6 +15,8 @@ impl ServerOperation {
             0 => Some(ServerOperation::ConnectServerRequest),
             1 => Some(ServerOperation::ConnectServerRequestTokenResponse),
             2 => Some(ServerOperation::ConnectGameRequest),
+            3 => Some(ServerOperation::MoveRequest),
+            4 => Some(ServerOperation::MoveResponse),
             _ => None,
         };
     }
@@ -28,6 +30,8 @@ impl fmt::Display for ServerOperation {
                 write!(f, "ConnectServerRequestTokenResponse")
             }
             ServerOperation::ConnectGameRequest => write!(f, "ConnectGameRequest"),
+            ServerOperation::MoveRequest => write!(f, "MoveRequest"),
+            ServerOperation::MoveResponse => write!(f, "MoveResponse"),
         }
     }
 }
