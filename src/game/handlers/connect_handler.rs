@@ -8,7 +8,7 @@ use crate::{
         game_state::{GameState, Notify},
         player::Player,
     },
-    tcp::{server::packet::Packet, server_operation::ServerOperation},
+    tcp::{server::packet::{self, Packet}, server_operation::ServerOperation},
 };
 
 use super::handler::Handler;
@@ -21,7 +21,7 @@ impl Handler for ConnectHandler {
             player.stream.peer_addr().unwrap(),
             data
         );
-        let token = "token-valid".to_string();
+        
         let player_clone = player.clone();
         let game_state = _game_state.lock().unwrap();
         // Verrouille ensuite la liste des joueurs
@@ -29,11 +29,11 @@ impl Handler for ConnectHandler {
         players_lock.push(player_clone);
         let player_clone_2 = player.clone();
         let data = format!(
-            "{{\"x\": \"{}\",\"y\": \"{}\",\"uid\": \"{}\"}}",
+            "{{\"x\": {},\"y\": {},\"uid\": \"{}\"}}",
             player_clone_2.x, player_clone_2.y, player_clone_2.uid
         );
-        let packet = Packet::encode(ServerOperation::MoveResponse, data);
-        let response = format!("{{\"token\": \"{}\"}}", token);
+        //let packet = Packet::encode(ServerOperation::MoveResponse, data);
+        let packet = Packet::encode(ServerOperation::ConnectServerRequestTokenResponse, data, Some("token".to_string()));
         let _ = player
             .stream
             .try_clone()

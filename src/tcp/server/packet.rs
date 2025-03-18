@@ -24,6 +24,7 @@ impl Packet {
             }
             count += 1;
         }
+        
         let int = operation.trim().parse().unwrap();
         let opt = ServerOperation::decode(int);
         let packet = match opt {
@@ -43,9 +44,10 @@ impl Packet {
         }
     }
 
-    pub fn encode(operation: ServerOperation, data: String) -> String {
+    pub fn encode(operation: ServerOperation, data: String, token: Option<String>) -> String {
         let opr = operation as i8;
-        return format!("|{opr}|{data}").to_string();
+        let tokn = token.unwrap_or("".to_string());
+        return format!("{tokn}|{opr}|{data}").to_string();
     }
 
     pub fn incorrect() -> String {

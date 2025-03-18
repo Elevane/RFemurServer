@@ -101,7 +101,7 @@ impl Server {
         let parts = message.split("|");
         if parts.clone().count() != 3 as usize {
             let _ = stream.shutdown(std::net::Shutdown::Both);
-            return println!("Incorrect tcp format {}", parts.clone().count());
+            return println!("Incorrect tcp format {}", message);
         }
         let packet = Packet::decode(parts).unwrap();
         self.state_handler.handle(packet, stream);

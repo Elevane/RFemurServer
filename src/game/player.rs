@@ -1,5 +1,5 @@
 use std::net::TcpStream;
-
+use rand::{self, Rng};
 pub struct Player {
     pub stream: TcpStream,
     pub x: f32,
@@ -10,10 +10,11 @@ pub struct Player {
 impl Player {
     pub(crate) fn new(tcp_stream: TcpStream) -> Self {
         let charset = "azertyuiopqsdfghjklmwxcvbn,;:!ù*$^";
+        let mut rng = rand::rng();
         Self {
             stream: tcp_stream,
-            x: 0.00,
-            y: 0.00,
+            x: rng.random_range(0.0..=500.0),
+            y: rng.random_range(0.0..=500.0),
             uid: random_string::generate(25, charset),
         }
     }
