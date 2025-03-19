@@ -47,12 +47,22 @@ impl StateHandler {
                 let game_state = self.game_state.lock().unwrap();
 
                 // Verrouille ensuite la liste des joueurs
-                let players_lock = game_state.players.lock().unwrap();
-                player = players_lock
+                let players_lock = game_state
+                    .players
+                    .lock()
+                    .expect("Could not lock gamestate lock");
+                let found_player = players_lock
                     .iter()
                     .find(|p| p.uid == identity.as_mut().unwrap().uid)
-                    .cloned()
-                    .unwrap();
+                    .cloned();
+                match found_player {
+                    Some(p) => {
+                        player = p;
+                    }
+                    None => {
+                        panic!("Counld not find players");
+                    }
+                }
             }
         } else {
             player = Player::new(tcp_stream);

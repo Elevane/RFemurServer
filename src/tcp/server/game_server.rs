@@ -28,66 +28,78 @@ impl Server {
         }
     }
 
-    pub fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn start(&mut self) -> () {
         let address = format!("{}:{}", "127.0.0.1", self.port);
         println!("Starting server on {}", address);
         let listener = TcpListener::bind(address).unwrap();
 
-        loop {
-            // The second item contains the IP and port of the new connection.
-            let (socket, _) = listener.accept().unwrap();
-            let _ = &self.handle_client(socket);
-        }
-    }
-
-    fn handle_client(&mut self, mut stream: TcpStream) {
-        let peer_addr = stream.peer_addr().unwrap();
-        println!("Client connecté: {}", peer_addr);
-        let mut buffer = [0; 512];
-        loop {
-            match stream.read(&mut buffer) {
-                Ok(0) => {
-                    println!("Client déconnecté: {}", peer_addr);
-                    self.disconnect(&stream);
-                    let _ = stream.shutdown(std::net::Shutdown::Both);
-                    break;
-                }
-                Ok(_) => {
-                    println!("recieved message");
-                    let message = String::from_utf8_lossy(&buffer);
-                    self.decode_message(stream.try_clone().unwrap(), message);
-                    if self.connections <= self.max_allowed_connections {
-                        self.connections += 1;
-                    } else {
-                        println!(
-                            "reached maximum connections {}",
-                            self.max_allowed_connections
-                        )
-                    }
+        // accept connections and process them serially
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    // Passez la référence mutable de `stream` à `handle_client`
+                    let stream_mutex = Arc::new(Mutex::new(stream));
+                    self.handle_client(stream_mutex);
                 }
                 Err(e) => {
-                    println!("Erreur avec le client {}: {}", peer_addr, e);
-                    self.disconnect(&stream);
-                    let _ = stream.shutdown(std::net::Shutdown::Both);
+                    println!("Erreur lors de l'acceptation de la connexion: {}", e);
                 }
             }
         }
     }
-    pub fn disconnect(&self, stream: &TcpStream) {
+
+    fn handle_client(&mut self, stream: Arc<Mutex<TcpStream>>) {
+        let mut buffer = [0; 1024];
+        loop {
+            {
+                let stream_lock = stream
+                    .lock()
+                    .expect("Could not lock stream in hadle client");
+                let peer_addr = stream_lock.try_clone().unwrap().peer_addr().unwrap();
+                match stream_lock.try_clone().unwrap().read(&mut buffer) {
+                    Ok(0) => {
+                        println!("Client déconnecté: {}", peer_addr);
+                        self.disconnect(stream_lock.try_clone().unwrap());
+                        let _ = stream_lock.shutdown(std::net::Shutdown::Both);
+                        break;
+                    }
+                    Ok(_) => {
+                        println!("Client connecté: {}", peer_addr);
+                        let message = String::from_utf8_lossy(&buffer);
+                        self.decode_message(stream_lock.try_clone().unwrap(), message);
+                        if self.connections <= self.max_allowed_connections {
+                            self.connections += 1;
+                        } else {
+                            println!(
+                                "reached maximum connections {}",
+                                self.max_allowed_connections
+                            )
+                        }
+                    }
+                    Err(e) => {
+                        println!("Erreur avec le client {} : {}", peer_addr, e);
+                        self.disconnect(stream_lock.try_clone().unwrap());
+                        let _ = stream_lock.shutdown(std::net::Shutdown::Both);
+                    }
+                }
+            }
+        }
+    }
+    pub fn disconnect(&self, stream: TcpStream) {
         // Verrouille le Mutex pour accéder à la liste des joueurs
         let game_state = self.game_state.lock().unwrap();
 
         // Verrouille ensuite la liste des joueurs
         let mut players = game_state.players.lock().unwrap();
-
         let mut index_to_remove = None;
-
         // Parcours des joueurs pour trouver celui à déconnecter
         for (index, player) in players.iter().enumerate() {
-            if player.stream.peer_addr().unwrap() == stream.peer_addr().unwrap() {
-                let _ = player.stream.shutdown(std::net::Shutdown::Both);
-                index_to_remove = Some(index);
-                break;
+            {
+                let player_stream = player.stream.lock().expect("Failed to lock player stream");
+                if player_stream.peer_addr().unwrap() != stream.peer_addr().unwrap() {
+                    let _ = player_stream.shutdown(std::net::Shutdown::Both);
+                    index_to_remove = Some(index);
+                }
             }
         }
 
@@ -101,8 +113,9 @@ impl Server {
         let parts = message.split("|");
         if parts.clone().count() != 3 as usize {
             let _ = stream.shutdown(std::net::Shutdown::Both);
-            return println!("Incorrect tcp format {}", parts.clone().count());
+            return println!("Incorrect tcp format  : {}", message);
         }
+
         let packet = Packet::decode(parts).unwrap();
         self.state_handler.handle(packet, stream);
     }

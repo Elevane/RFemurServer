@@ -23,7 +23,10 @@ impl Handler for MoveHandler {
         }
         let message = serde_json::to_string(&move_request_obj).unwrap();
         let game_state = _game_state.lock().unwrap();
-        game_state.notify(player.stream, message, Notify::All);
+        {
+            let player_lock = player.stream.lock().unwrap();
+            game_state.notify(player_lock, message, Notify::All);
+        }
     }
 }
 

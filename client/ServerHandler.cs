@@ -1,123 +1,131 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
-using UnityEngine;
+using System.Text.Json;
+using System.Threading;
 
-public class TcpClientUnity : MonoBehaviour
+class Character
 {
-    private TcpClient tcpClient;
-    private NetworkStream networkStream;
-    private StreamReader reader;
-    private StreamWriter writer;
-
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Id { get; set; }
     
-    private string serverAddress = "127.0.0.1";
-    private int serverPort = 3333;
-
-    private bool isConnected = false;
-
-    void Start()
+    public Character(int x, int y, int id)
     {
-        ConnectToServer();
+        X = x;
+        Y = y;
+        Id = id;
     }
+}
 
-    void Update()
-    {
-        if (isConnected)
-        {
-            if (networkStream.DataAvailable)
-            {
-                string message = reader.ReadLine();
-                if (!string.IsNullOrEmpty(message))
-                {
-                    ProcessMessage(message);
-                }
-            }
-        }
-    }
+class Client
+{
+    private const string Host = "127.0.0.1";
+    private const int Port = 3333;
+    private const int BufferSize = 1024;
 
-    private void ConnectToServer()
+    private TcpClient serverSocket;
+    private NetworkStream stream;
+    private string _token;
+    private Character character;
+    private Queue<string> messageQueue = new();
+    private readonly object queueLock = new();
+
+    public void Run()
     {
         try
         {
-            tcpClient = new TcpClient(serverAddress, serverPort);
-            networkStream = tcpClient.GetStream();
-            reader = new StreamReader(networkStream, Encoding.UTF8);
-            writer = new StreamWriter(networkStream, Encoding.UTF8);
+            serverSocket = new TcpClient(Host, Port);
 
-            isConnected = true;
-            Debug.Log("Connected to server.");
+            stream = serverSocket.GetStream();
+            //Connection au listener TCP
+            Console.WriteLine("--> Connecté au serveur TCP");
+            //Connection au server de jeu
+            SendMessage(" |0| ");
+            
+            Thread listenerThread = new(ThreadListen);
+            listenerThread.IsBackground = true;
+            listenerThread.Start();
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            Debug.LogError("Error connecting to server: " + ex.Message);
-        }
-    }
-
-    public void SendMessageToServer(string message)
-    {
-        if (isConnected)
-        {
-            try
-            {
-                writer.WriteLine(message);
-                writer.Flush();
-                Debug.Log("Sent message: " + message);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Error sending message: " + ex.Message);
-            }
-        }
-    }
-
-    private void ProcessMessage(string message)
-    {
-        string[] parts = message.Split('|');
-        if (parts.Length != 3)
-        {
-            Debug.LogError("Invalid message format.");
+            Console.WriteLine($"Impossible de se connecter : {e.Message}");
             return;
         }
 
-        string token = parts[0];
+        while (true)
+        {
+            ProcessServerMessages();
+        }
+    }
+
+    private void ThreadListen()
+    {
+        try
+        {
+            byte[] buffer = new byte[BufferSize];
+            while (true)
+            {
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                if (bytesRead > 0)
+                {
+                    string data = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    lock (queueLock) { messageQueue.Enqueue(data); }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Erreur de réception : {e.Message}");
+        }
+    }
+
+    private void ProcessServerMessages()
+    {
+        while (messageQueue.Count > 0)
+        {
+            string message;
+            lock (queueLock) { message = messageQueue.Dequeue(); }
+            InterpretData(message);
+        }
+    }
+
+    private void InterpretData(string data)
+    {
+        string[] parts = data.Split('|');
+        if (parts.Length < 3) return;
+        
         string operation = parts[1];
-        string content = parts[2];
-
-        Debug.Log($"Received message: Token = {token}, Operation = {operation}, Content = {content}");
-
+        
         switch (operation)
         {
-            case OperationType.MoveResponse:
-                onEntityMove(content);
+            case "1": // CONNECT_SERVER_Response
+                var token = parts[0];
+                Console.WriteLine($"--> Token récupéré : {token}");
+                character = JsonSerializer.Deserialize<Character>(parts[2]);      
+                _token =  token;
                 break;
-
-            default:
-                Debug.LogWarning("Unknown operation received.");
+            case "2": //Other player packet connect
+                Console.WriteLine($"--> Other client connected {parts}");
+                //character = JsonSerializer.Deserialize<Character>(parts[2]);      
+                //_token =  token;
                 break;
         }
     }
 
-    private void OnApplicationQuit()
+    private void SendMessage(string message)
     {
-        if (tcpClient != null && tcpClient.Connected)
-        {
-            writer.Close();
-            reader.Close();
-            networkStream.Close();
-            tcpClient.Close();
-        }
-
-        Debug.Log("Disconnected from server.");
+        byte[] data = Encoding.UTF8.GetBytes(message.PadRight(BufferSize));
+        stream.Write(data, 0, data.Length);
     }
-
-    internal enum OperationType{
-            ConnectServerRequest,
-            ConnectServerRequestTokenResponse,
-            ConnectGameRequest,
-            MoveRequest,
-            MoveResponse,
-    }
-
 }
+
+class Program
+{
+    static void Main()
+    {
+        Client client = new();
+        client.Run();
+    }
+}  

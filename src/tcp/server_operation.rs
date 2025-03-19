@@ -4,7 +4,7 @@ use std::fmt::{self};
 pub enum ServerOperation {
     ConnectServerRequest,
     ConnectServerRequestTokenResponse,
-    ConnectGameRequest,
+    ConnectServerOtherPlayer,
     MoveRequest,
     MoveResponse,
 }
@@ -14,7 +14,7 @@ impl ServerOperation {
         return match operation {
             0 => Some(ServerOperation::ConnectServerRequest),
             1 => Some(ServerOperation::ConnectServerRequestTokenResponse),
-            2 => Some(ServerOperation::ConnectGameRequest),
+            2 => Some(ServerOperation::ConnectServerOtherPlayer),
             3 => Some(ServerOperation::MoveRequest),
             4 => Some(ServerOperation::MoveResponse),
             _ => None,
@@ -29,7 +29,7 @@ impl fmt::Display for ServerOperation {
             ServerOperation::ConnectServerRequestTokenResponse => {
                 write!(f, "ConnectServerRequestTokenResponse")
             }
-            ServerOperation::ConnectGameRequest => write!(f, "ConnectGameRequest"),
+            ServerOperation::ConnectServerOtherPlayer => write!(f, "ConnectServerOtherPlayer"),
             ServerOperation::MoveRequest => write!(f, "MoveRequest"),
             ServerOperation::MoveResponse => write!(f, "MoveResponse"),
         }
