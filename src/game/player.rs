@@ -14,13 +14,24 @@ pub struct Player {
 
 impl Player {
     pub(crate) fn new(tcp_stream: TcpStream) -> Self {
-        let charset = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN123456789";
         let mut rng = rand::rng();
         Self {
             stream: Arc::new(Mutex::new(tcp_stream)),
             x: rng.random_range(0.0..=500.0),
             y: rng.random_range(0.0..=500.0),
-            uid: random_string::generate(25, charset),
+            uid: generate_id(),
         }
     }
+}
+
+pub fn generate_id() -> String {
+    let charset = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN123456789";
+    let mut rng = rand::rng();
+    let length = 16;
+    let mut id = "".to_string();
+    for _ in 1..length {
+        let char = charset.as_bytes()[rng.random_range(0..charset.chars().count())] as char;
+        id.push(char);
+    }
+    return id;
 }

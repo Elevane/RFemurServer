@@ -36,65 +36,60 @@ impl GameState {
         };
 
         let to_notify: Vec<Arc<Mutex<TcpStream>>>;
+
         {
-            println!("Trying to lock players...");
-            let players = self.players.lock().expect("Failed to lock players list");
-            println!("Players locked");
+            // On verrouille la liste des joueurs
+            let players = match self.players.lock() {
+                Ok(players) => players,
+                Err(_) => {
+                    println!("Failed to lock players list");
+                    return;
+                }
+            };
 
             if players.is_empty() {
                 println!("No players to notify");
                 return;
             }
 
-            println!("Filtering players...");
+            println!("Players lock initialized");
 
+            // Filtrage des joueurs à notifier
             to_notify = players
                 .iter()
                 .filter_map(|player| {
                     let player_stream = player.stream.clone();
-                    println!("Checking player...");
-                
-                    let player_addr = {
-                        println!("Trying to lock player stream...");
-                        let stream = match player_stream.lock() {
-                            Ok(s) => {
-                                println!("Player stream locked successfully.");
-                                s
-                            }
-                            Err(e) => {
-                                println!("Failed to lock player stream: {}", e);
-                                return None;
-                            }
-                        };
-                        println!("Trying to get peer address...");
-                        match stream.peer_addr() {
-                            Ok(addr) => {
-                                println!("Got peer address: {}", addr);
-                                Some(addr)
-                            }
-                            Err(e) => {
-                                println!("Failed to get peer address: {}", e);
-                                None
+
+                    // Tenter de verrouiller le stream du joueur
+                    println!("Trying to lock player stream...");
+                    match player_stream.lock() {
+                        Ok(stream) => {
+                            // Nous avons verrouillé le stream avec succès
+                            match stream.peer_addr() {
+                                Ok(addr) => {
+                                    if addr != sender_addr {
+                                        println!("Adding player to notify list...");
+                                        return Some(player_stream.clone());
+                                    }
+                                }
+                                Err(_) => {
+                                    println!("Failed to get player address");
+                                }
                             }
                         }
-                    };
-                
-                    if let Some(addr) = player_addr {
-                        if addr != sender_addr {
-                            println!("Adding player to notify list...");
-                            return Some(player_stream);
+                        Err(_) => {
+                            println!("Failed to lock player stream.");
                         }
                     }
-                
-                    println!("Skipping player...");
+
                     None
                 })
-                
                 .collect();
 
-            println!("to notify initialized");
+            println!("to_notify initialized");
         }
 
+        // Étape 2 : Envoyer les messages (verrouiller les `TcpStream` un par un)
         for stream in to_notify {
             if let Ok(mut player_stream) = stream.lock() {
                 if let Err(e) = player_stream.write_all(message.as_bytes()) {

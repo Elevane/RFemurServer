@@ -33,13 +33,10 @@ impl Server {
         println!("Starting server on {}", address);
         let listener = TcpListener::bind(address).unwrap();
 
-        // accept connections and process them serially
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
-                    // Passez la référence mutable de `stream` à `handle_client`
-                    let stream_mutex = Arc::new(Mutex::new(stream));
-                    self.handle_client(stream_mutex);
+                    self.handle_client(stream);
                 }
                 Err(e) => {
                     println!("Erreur lors de l'acceptation de la connexion: {}", e);
@@ -48,47 +45,50 @@ impl Server {
         }
     }
 
-    fn handle_client(&mut self, stream: Arc<Mutex<TcpStream>>) {
-        let mut buffer = [0; 1024];
+    fn handle_client(&mut self, stream: TcpStream) {
+        let mut buffer = [0; 512];
+        let mut stream_clone = stream.try_clone().unwrap();
         loop {
-            {
-                let stream_lock = stream
-                    .lock()
-                    .expect("Could not lock stream in hadle client");
-                let peer_addr = stream_lock.try_clone().unwrap().peer_addr().unwrap();
-                match stream_lock.try_clone().unwrap().read(&mut buffer) {
-                    Ok(0) => {
-                        println!("Client déconnecté: {}", peer_addr);
-                        self.disconnect(stream_lock.try_clone().unwrap());
-                        let _ = stream_lock.shutdown(std::net::Shutdown::Both);
-                        break;
+            match stream_clone.read(&mut buffer) {
+                Ok(0) => {
+                    println!(
+                        "Client déconnecté: {}",
+                        stream_clone.try_clone().unwrap().peer_addr().unwrap()
+                    );
+                    self.disconnect(stream_clone.try_clone().unwrap());
+                    let _ = stream_clone.shutdown(std::net::Shutdown::Both);
+                    break;
+                }
+                Ok(_) => {
+                    println!("recieved message");
+                    let message = String::from_utf8_lossy(&buffer);
+                    self.decode_message(stream_clone.try_clone().unwrap(), message);
+                    if self.connections <= self.max_allowed_connections {
+                        self.connections += 1;
+                    } else {
+                        println!(
+                            "reached maximum connections {}",
+                            self.max_allowed_connections
+                        )
                     }
-                    Ok(_) => {
-                        println!("Client connecté: {}", peer_addr);
-                        let message = String::from_utf8_lossy(&buffer);
-                        self.decode_message(stream_lock.try_clone().unwrap(), message);
-                        if self.connections <= self.max_allowed_connections {
-                            self.connections += 1;
-                        } else {
-                            println!(
-                                "reached maximum connections {}",
-                                self.max_allowed_connections
-                            )
-                        }
-                    }
-                    Err(e) => {
-                        println!("Erreur avec le client {} : {}", peer_addr, e);
-                        self.disconnect(stream_lock.try_clone().unwrap());
-                        let _ = stream_lock.shutdown(std::net::Shutdown::Both);
-                    }
+                }
+                Err(e) => {
+                    println!(
+                        "Erreur avec le client {}: {}",
+                        stream_clone.try_clone().unwrap().peer_addr().unwrap(),
+                        e
+                    );
+                    self.disconnect(stream_clone.try_clone().unwrap());
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
                 }
             }
         }
     }
+
     pub fn disconnect(&self, stream: TcpStream) {
         // Verrouille le Mutex pour accéder à la liste des joueurs
         let game_state = self.game_state.lock().unwrap();
-
+        let _ = stream.peer_addr().unwrap();
         // Verrouille ensuite la liste des joueurs
         let mut players = game_state.players.lock().unwrap();
         let mut index_to_remove = None;
