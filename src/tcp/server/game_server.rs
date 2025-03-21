@@ -14,7 +14,7 @@ pub struct Server {
     port: i16,
     connections: i16,
 }
-
+//TODO : probleme de multi connnections
 impl Server {
     pub fn new(max_allowed_connections: Option<i16>, port: Option<i16>) -> Self {
         let game_state = Arc::new(Mutex::new(GameState::new()));
