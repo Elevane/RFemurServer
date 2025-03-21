@@ -1,6 +1,7 @@
-use rand::{self, Rng};
+use rand::Rng;
 use std::{
-    net::TcpStream,
+    io::Write,
+    net::{SocketAddr, TcpStream},
     sync::{Arc, Mutex},
 };
 
@@ -20,6 +21,18 @@ impl Player {
             x: rng.random_range(0.0..=500.0),
             y: rng.random_range(0.0..=500.0),
             uid: generate_id(),
+        }
+    }
+
+    pub fn send_response(&self, packet: String) {
+        {
+            let _ = self.stream.lock().unwrap().write(packet.as_bytes());
+        }
+    }
+
+    pub fn get_peer_addr(&self) -> SocketAddr {
+        {
+            return self.stream.lock().unwrap().peer_addr().unwrap();
         }
     }
 }
