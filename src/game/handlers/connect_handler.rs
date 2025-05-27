@@ -4,21 +4,20 @@ use crate::{
     game::{game_state::GameState, player::Player},
     tcp::{server::packet::Packet, server_operation::ServerOperation},
 };
-use std::{future::Future, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use super::handler::Handler;
 
 pub struct ConnectHandler;
 
 impl Handler for ConnectHandler {
-    async fn handle<'a>(
+    fn handle<'a>(
         &self,
         game_state: GameState,
-        _data: Option<&str>,
+        _data: Option<&'a str>,
         player: Player,
-    ) -> Box<dyn Future<Output = ()> + Send + 'a> {
-        Box::new(async move {
-            // Handle the connection logic here
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
+        Box::pin(async move {
             println!("handling connecthandler");
             let data = format!(
                 "{{\"x\": {},\"y\": {},\"uid\": \"{}\"}}",
@@ -33,7 +32,6 @@ impl Handler for ConnectHandler {
         })
     }
 }
-
 async fn notify_other_players(
     player: Player,
     players_lock: Arc<RwLock<Vec<Player>>>,
@@ -48,7 +46,8 @@ async fn notify_other_players(
 
     for p in players_lock.read().await.iter() {
         if p.uid != player.uid {
-            p.send_response(other_packet.clone());
+            println!("Send to player: {}", p.uid);
+            p.send_response(other_packet.clone()).await;
         }
     }
 }
@@ -60,5 +59,5 @@ async fn notify_player(player: &Player, data: &String) {
         Some("token".to_string()),
     );
     let player_clone = player.clone();
-    player_clone.send_response(packet);
+    player_clone.send_response(packet).await;
 }

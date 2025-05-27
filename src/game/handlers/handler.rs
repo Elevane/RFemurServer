@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use tokio::sync::RwLock;
 
@@ -9,9 +9,9 @@ pub trait Handler {
     fn handle<'a>(
         &self,
         game_state: GameState,
-        data: Option<&str>,
+        data: Option<&'a str>,
         player: Player,
-    ) -> Box<dyn Future<Output = ()> + Send + 'a>;
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 }
 
 pub trait AsyncHandler {
@@ -20,5 +20,5 @@ pub trait AsyncHandler {
         game_state: GameState,
         data: Option<&str>,
         player: Player,
-    ) -> Box<dyn Future<Output = ()> + Send + 'a>;
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 }

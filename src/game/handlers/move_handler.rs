@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     game::{game_state::GameState, player::Player},
@@ -14,31 +14,29 @@ pub struct MoveHandler;
 impl Handler for MoveHandler {
     fn handle<'a>(
         &self,
-        _game_state: GameState,
-        _data: Option<&str>,
-        mut player: Player,
-    ) -> Box<dyn Future<Output = ()> + Send + 'a> {
-        Box::new(async move {
-            let data = "_data.unwrap()"; //TODO handle lifetime with optional
+        game_state: GameState,
+        _data: Option<&'a str>,
+        player: Player,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
+        Box::pin(async move {
+            let data = _data.expect("Missing move data"); // à améliorer
             let move_request_obj: MoveHandlerRequest =
-                serde_json::from_str(data).expect("Failed to parse MoveHandlerRequest JSON");
-            println!("asked direction {}", move_request_obj.direction as i8);
+                serde_json::from_str(data).expect("Invalid MoveHandlerRequest");
 
+            let mut player = player;
             match move_request_obj.direction {
                 MoveDirection::UP => player.x += 10.0,
                 MoveDirection::DOWN => player.x -= 10.0,
                 MoveDirection::LEFT => player.y -= 10.0,
                 MoveDirection::RIGHT => player.y += 10.0,
             }
-            let data = serde_json::to_string(&move_request_obj).unwrap();
 
-            notify_player(&player, &data).await;
-
-            notify_other_players(player, _game_state.players, data).await;
+            let response = serde_json::to_string(&move_request_obj).unwrap();
+            notify_player(&player, &response).await;
+            notify_other_players(player, game_state.players, response).await;
         })
     }
 }
-
 async fn notify_other_players(
     player: Player,
     players_lock: Arc<RwLock<Vec<Player>>>,
@@ -53,7 +51,7 @@ async fn notify_other_players(
 
     for p in players_lock.read().await.iter() {
         if p.uid != player.uid {
-            p.send_response(other_packet.clone());
+            p.send_response(other_packet.clone()).await;
         }
     }
 }
@@ -65,7 +63,7 @@ async fn notify_player(player: &Player, data: &String) {
         Some("token".to_string()),
     );
     let player_clone = player.clone();
-    player_clone.send_response(packet);
+    player_clone.send_response(packet).await;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]

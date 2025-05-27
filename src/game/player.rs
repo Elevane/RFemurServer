@@ -32,6 +32,7 @@ impl Player {
         if let Err(e) = stream.write_all(packet.as_bytes()).await {
             eprintln!("Failed to send response: {}", e);
         }
+        println!("Response sent to player: {}", self.uid);
     }
 }
 

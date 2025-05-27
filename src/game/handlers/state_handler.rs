@@ -27,7 +27,7 @@ impl StateHandler {
             Box::new(ConnectHandler),
         );
         handlers.insert(ServerOperation::MoveRequest as i8, Box::new(MoveHandler));
-        let mut se = Self {
+        let se = Self {
             game_state,
             handlers,
         };
@@ -60,10 +60,13 @@ impl StateHandler {
             }
         } else {
             player = Player::new(tcp_stream);
-            game_state.add_player(player.clone());
+            game_state.add_player(player.clone()).await;
         }
         if let Some(handler) = self.handlers.get(&(packet.operation as i8)) {
-            handler.handle(game_state.clone(), Some(&packet.content), player);
+            println!("handle {}", packet.operation as i8);
+            handler
+                .handle(game_state.clone(), Some(&packet.content), player)
+                .await;
         } else {
             println!("No handler for operation");
         }
@@ -83,8 +86,8 @@ impl StateHandler {
             }
         }
         if let Some(player) = player_to_remove {
-            let mut game_state = self.game_state.write().await;
-            game_state.remove_player(player);
+            let game_state = self.game_state.write().await;
+            game_state.remove_player(player).await;
         }
     }
 
