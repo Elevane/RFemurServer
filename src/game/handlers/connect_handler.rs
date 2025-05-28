@@ -56,7 +56,7 @@ async fn notify_player(player: &Player, data: &String) {
     let packet = Packet::encode(
         ServerOperation::ConnectServerRequestTokenResponse,
         data.clone(),
-        Some("token".to_string()),
+        Some(player.uid.to_string()),
     );
     let player_clone = player.clone();
     player_clone.send_response(packet).await;

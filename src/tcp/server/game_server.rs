@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncReadExt,
     net::{TcpListener, TcpStream},
     sync::RwLock,
 };
 
-use crate::game::{
-    game_state::GameState,
-    handlers::state_handler::{self, StateHandler},
-};
+use crate::game::{game_state::GameState, handlers::state_handler::StateHandler};
 
 use super::packet::Packet;
 
@@ -20,7 +17,6 @@ pub struct Server {
     pub game_state: Arc<RwLock<GameState>>,
 }
 
-//TODO : probleme de multi connnections
 impl Server {
     pub fn new(max_allowed_connections: Option<i16>, port: Option<i16>) -> Self {
         Self {
@@ -32,21 +28,25 @@ impl Server {
     }
 
     pub async fn start(&mut self) -> std::io::Result<()> {
-        let listener = TcpListener::bind("127.0.0.1:3333").await?;
+        let ip = local_ip_address::local_ip().unwrap();
+        let address = format!("{}:{}", ip, self.port);
+        let listener = TcpListener::bind(address.clone()).await?;
+        println!("Starting server on {}", address);
+        println!("Max allowed connections: {}", self.max_allowed_connections);
+        println!("Waiting for clients to connect...");
         loop {
-            let mut state_handler = StateHandler::init(Arc::clone(&self.game_state));
-            let (mut stream, addr): (TcpStream, _) = listener.accept().await?;
+            let state_handler = StateHandler::init(Arc::clone(&self.game_state));
+            let (stream, _): (TcpStream, _) = listener.accept().await?;
             tokio::spawn(async move { Server::handle_client(stream, state_handler).await });
+            println!("Active connection at the moment: {}", self.connections);
         }
     }
 
     pub async fn handle_client(stream: TcpStream, state_handler: StateHandler) {
-        let player_stream = Arc::new(RwLock::new(stream)); // Créé une seule fois
-
+        let player_stream = Arc::new(RwLock::new(stream));
         let mut buffer = [0; 1024];
         loop {
-            let mut stream = player_stream.write().await; // Accès mutable pour lecture
-
+            let mut stream = player_stream.write().await;
             match stream.read(&mut buffer).await {
                 Ok(0) => {
                     state_handler.remove_connection(&player_stream).await;
@@ -56,10 +56,9 @@ impl Server {
                 Ok(_) => {
                     println!("Message reçu");
                     let message = String::from_utf8_lossy(&buffer);
-                    println!("Reçu {}", message);
+                    println!("Reçu {}", message.trim());
 
-                    // Déverrouille le stream avant de passer à decode_message()
-                    drop(stream); // Permet à d'autres tâches de lire le stream
+                    drop(stream);
                     println!("Déverrouillé le stream");
                     Server::decode_message(player_stream.clone(), message, &state_handler).await;
                 }
@@ -76,15 +75,12 @@ impl Server {
         message: std::borrow::Cow<'_, str>,
         state_handler: &StateHandler,
     ) -> () {
-        println!("Decode message ");
         let parts = message.split("|");
         if parts.clone().count() != 3 as usize {
             //drop(stream); //.shutdown(std::net::Shutdown::Both);
             return println!("Incorrect tcp format {}", message);
         }
-        println!("to decode packet");
         let packet = Packet::decode(parts).unwrap();
-        println!("decoded packet");
         state_handler.handle(packet, stream).await;
     }
 }

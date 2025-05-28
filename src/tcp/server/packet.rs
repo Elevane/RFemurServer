@@ -24,7 +24,7 @@ impl Packet {
             }
             count += 1;
         }
-        
+
         let int = operation.trim().parse().unwrap();
         let opt = ServerOperation::decode(int);
         let packet = match opt {
@@ -48,9 +48,5 @@ impl Packet {
         let opr = operation as i8;
         let tokn = token.unwrap_or("".to_string());
         return format!("{tokn}|{opr}|{data}").to_string();
-    }
-
-    pub fn incorrect() -> String {
-        return format!("|999|").to_string();
     }
 }

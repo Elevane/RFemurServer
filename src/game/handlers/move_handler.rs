@@ -7,7 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use super::handler::{AsyncHandler, Handler};
+use super::handler::Handler;
 
 pub struct MoveHandler;
 
@@ -20,6 +20,7 @@ impl Handler for MoveHandler {
     ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
         Box::pin(async move {
             let data = _data.expect("Missing move data"); // à améliorer
+            println!("Handling MoveHandler with data: {}", data.trim());
             let move_request_obj: MoveHandlerRequest =
                 serde_json::from_str(data).expect("Invalid MoveHandlerRequest");
 

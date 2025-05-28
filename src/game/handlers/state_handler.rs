@@ -1,10 +1,7 @@
 use tokio::{net::TcpStream, sync::RwLock};
 
 use crate::{
-    game::{
-        game_state::{self, GameState},
-        player::{self, Player},
-    },
+    game::{game_state::GameState, player::Player},
     tcp::{
         server::{auth::identity::Identity, packet::Packet},
         server_operation::ServerOperation,
@@ -48,13 +45,15 @@ impl StateHandler {
                     .iter()
                     .find(|p| p.uid == identity.as_mut().unwrap().uid)
                     .cloned();
-
                 match found_player {
                     Some(p) => {
                         player = p;
                     }
                     None => {
-                        panic!("player isn't in game state")
+                        panic!(
+                            "player isn't in game state {}",
+                            identity.as_mut().unwrap().uid,
+                        )
                     }
                 }
             }
@@ -68,7 +67,7 @@ impl StateHandler {
                 .handle(game_state.clone(), Some(&packet.content), player)
                 .await;
         } else {
-            println!("No handler for operation");
+            println!("No handler for operation {}", packet.operation as i8);
         }
     }
 
@@ -89,14 +88,5 @@ impl StateHandler {
             let game_state = self.game_state.write().await;
             game_state.remove_player(player).await;
         }
-    }
-
-    async fn find_player_to_remove(players: &Vec<Player>, stream: &TcpStream) -> Option<Player> {
-        for player in players.iter() {
-            if player.peer_addr().await == stream.peer_addr().unwrap() {
-                return Some(player.clone());
-            }
-        }
-        None
     }
 }

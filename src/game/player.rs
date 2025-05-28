@@ -1,5 +1,5 @@
 use rand::Rng;
-use std::{future::IntoFuture, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::RwLock};
 
 #[derive(Clone)]
